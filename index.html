@@ -107,7 +107,7 @@
     <div class="barLabel small" id="sumLabel"></div>
 
     <div class="result-line" id="combinedLine">Combined support potential: —</div>
-    <div class="result-line" id="idealLine" style="font-weight:600;">Support ideals: Fuel = <strong>-40</strong>, Sum-other = <strong>70</strong></div>
+    <div class="result-line" id="idealLine" style="font-weight:600;">Support ideals: Fuel = <strong>-45</strong>, Sum-other = <strong>70</strong></div>
     <div class="result-line" id="proximityLine">Proximity to ideal (combined): —</div>
   </div>
 
@@ -126,12 +126,12 @@
   <div id="err" style="display:none;color:#b00;font-size:12px;"></div>
 </div>
 
-<footer class="muted" id="footerNote">Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel −40, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).</footer>
+<footer class="muted" id="footerNote">Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel -45, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).</footer>
 
 <script>
 (function(){
   // ----- Constants
-  const IDEAL_FUEL = -40;
+  const IDEAL_FUEL = -45;
   const IDEAL_SUM_OTHER = 70;
   const CEILING_MAIN = 60;
   const RANK_THRESHOLDS = [4,8,15,25,30,35,40,45,50,55];
@@ -165,7 +165,7 @@
         ceilingTitle:"Ceiling proximity (unified):",
         ceilingLabelSupport:(p)=>`Ceiling proximity: ${p}% (combined support)`, 
         ceilingLabelNon:(fm)=>`Ceiling proximity: ${Math.round((fm/CEILING_MAIN)*100)}% (future main ${fm}/${CEILING_MAIN})`,
-        footer:"Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel −40, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).",
+        footer:"Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel -45, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).",
         bands:{excellent:"Excellent", good:"Good", medium:"Medium", weak:"Weak", veryweak:"Very weak"}
       },
       verdictsNonByScore: {
@@ -200,15 +200,15 @@
     ru: {
       title:"NMS — Калькулятор флотилии фрегатов",
       langLabel:"Язык",
-      intro:"Введи текущие статы и число завершённых экспедиций; укажи цель для прогноза. Отметь «Фрегат поддержки» для оценки (топливо + сумма остальных).",
+      intro:"Введите текущие статы и число завершённых экспедиций; укажите целевое количество экспедиций для прогноза (по умолчанию 55, т.к. после статы перестают расти). Для фригатов поддержки отметить флаг «Фрегат поддержки» и ввести расход топлива (суммарно текущая экономия топлива, как правило со знаком минус).",
       labels:{
         combat:"Боевой", expl:"Исследовательский", ind:"Промышленный", trade:"Торговый",
         support:"Поддержка / расход топлива (отрицательное — лучше)",
         completed:"Завершённые экспедиции", target:"Целевые экспедиции (прогноз)",
-        isSupport:"Фрегат поддержки", helpIsSupport:"Если отмечено — оценивается как поддержка. Если нет — тип = максимальному из боевой/исслед./пром./торг.",
-        calc:"Рассчитать", reset:"Сброс", resetNote:"Сброс очищает поля и пересчитывает.",
+        isSupport:"Фрегат поддержки", helpIsSupport:"Если отмечено — оценивается как фрегат поддержки. Если нет — тип определяется по максимальному показателю из боевой/исслед./пром./торг.",
+        calc:"Рассчитать", reset:"Сброс", resetNote:"(Очистка полей и результатов).",
         shipType:"Тип корабля",
-        aps:(ap,tonext,target,apt,add)=>`Рангов пройдено: <strong>${ap}</strong>; до следующего: <strong>${tonext===0?'0 — возможно все пройдены':tonext}</strong>. Цель: ${target} (рангов на цели: ${apt}; добавится: ${add}).`,
+        aps:(ap,tonext,target,apt,add)=>`Рангов пройдено: <strong>${ap}</strong>; до следующего: <strong>${tonext===0?'0 — возможно все пройдены':tonext}</strong> экспедиций. Цель: ${target} (рангов на цели: ${apt}; добавится рангов: ${add}).`,
         fuelLine:(f,c)=>`Топливо (прогноз): <strong>${f}</strong> (текущее: ${c})`,
         sumOther:(s)=>`Сумма остальных (прогноз): <strong>${s}</strong>`,
         combined:(p)=>`Комбинированный потенциал поддержки: <strong>${p}%</strong>`,
@@ -220,7 +220,7 @@
         ceilingTitle:"Близость к потолку (унифицировано):",
         ceilingLabelSupport:(p)=>`Близость к потолку: ${p}% (комбинированный потенциал)`, 
         ceilingLabelNon:(fm)=>`Близость к потолку: ${Math.round((fm/CEILING_MAIN)*100)}% (прогноз ${fm}/${CEILING_MAIN})`,
-        footer:"Ранги: [4,8,15,25,30,35,40,45,50,55], каждый даёт +6 очков. Не‑поддержка: ~60% в основной стат. Поддержка: ~70% в топливо (в минус), ~30% равномерно в 4 стата. Комбинированная близость: топливо 80% + сумма 20% к идеалам (топливо −40, сумма 70). Унифицированная шкала: main/60 (не‑поддержка) или combined% (поддержка).",
+        footer:"Ранги: [4,8,15,25,30,35,40,45,50,55], каждый даёт +6 очков. Не‑поддержка: ~60% в основной стат, ~40% распределится между остальными. Поддержка: ~70% в топливо (в минус), ~30% между статами. Комбинировано считаем: топливо 80% влияния на результат, статы 20% (так как основная цель фрегатов поддержки − экономия топлива). Для поддержки считам за «потолок» (топливо -45, сумма статов 70). Унифицированная шкала: main/60 (не‑поддержка) или combined% (поддержка).",
         bands:{excellent:"Excellent", good:"Good", medium:"Medium", weak:"Weak", veryweak:"Very weak"}
       },
       verdictsNonByScore: {
@@ -499,8 +499,8 @@
 
     // Ideals line
     el.idealLine.innerHTML = (lang==='ru'
-      ? 'Идеалы поддержки: Топливо = <strong>-40</strong>, Сумма остальных = <strong>70</strong>'
-      : 'Support ideals: Fuel = <strong>-40</strong>, Sum-other = <strong>70</strong>'
+      ? 'Идеалы поддержки: Топливо = <strong>-45</strong>, Сумма остальных = <strong>70</strong>'
+      : 'Support ideals: Fuel = <strong>-45</strong>, Sum-other = <strong>70</strong>'
     );
   }
 
@@ -551,3 +551,4 @@
 </script>
 </body>
 </html>
+
