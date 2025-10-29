@@ -1,0 +1,553 @@
+
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>NMS — Frigate Fleet Calculator</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root{
+    --bg:#fbfbfc; --card:#fff; --line:#e6e6e6; --txt:#111; --muted:#666;
+    --blue-bg:#e7f0ff; --blue-t:#033e6b;
+    --green-bg:#e8f9ea; --green-t:#0b5e2e;
+    --yellow-bg:#fff4cc; --yellow-t:#744b00;
+    --red-bg:#ffdfe0; --red-t:#7a1a1a;
+    --gray-bg:#e2e3e5; --gray-t:#404040;
+  }
+  body{font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; padding:18px; color:var(--txt); background:var(--bg);}
+  h1{font-size:20px; margin:0 0 8px 0;}
+  label{display:block; margin-top:10px; font-weight:600;}
+  input[type=number]{width:160px; padding:6px; margin-right:8px; border:1px solid #ccc; border-radius:8px;}
+  input[type=checkbox]{transform:scale(1.1); margin-right:6px;}
+  select{padding:6px; border:1px solid #ccc; border-radius:8px;}
+  .controls{margin-bottom:14px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--card);}
+  .out{padding:12px; border-radius:10px; margin-top:12px; border:1px solid var(--line); background:var(--card);}
+  .result-line{margin:8px 0; font-weight:600;}
+  .badge{display:inline-block; padding:4px 10px; border-radius:999px; font-weight:700;}
+  .badge.wrap{white-space:normal; line-height:1.25; word-break:break-word; max-width:100%;}
+  .muted{color:var(--muted); font-size:13px;}
+  button{padding:8px 12px; border-radius:8px; border:1px solid #bbb; background:white; cursor:pointer;}
+  .small{font-size:13px; color:#555;}
+  .grid{display:grid; grid-template-columns:repeat(2,1fr); gap:12px;}
+  .barWrap{background:#eee; border-radius:10px; overflow:hidden; height:18px; margin-top:6px;}
+  .bar{height:100%; width:0%; background:linear-gradient(90deg,#4caf50,#1e88e5); transition:width .35s ease;}
+  .barLabel{font-size:13px; margin-top:6px;}
+
+  /* Status colors */
+  .st-excellent { background:var(--blue-bg);   color:var(--blue-t); }
+  .st-good      { background:var(--green-bg);  color:var(--green-t); }
+  .st-medium    { background:var(--yellow-bg); color:var(--yellow-t); }
+  .st-weak      { background:var(--red-bg);    color:var(--red-t); }
+  .st-veryweak  { background:var(--gray-bg);   color:var(--gray-t); }
+
+  @media(max-width:640px){
+    .grid{grid-template-columns:1fr;}
+    input[type=number]{width:100%;}
+  }
+</style>
+</head>
+<body>
+<div style="display:flex; justify-content:space-between; align-items:center; gap:10px;">
+  <h1 id="title">NMS — Frigate Fleet Calculator</h1>
+  <div class="small">
+    <label for="lang" style="font-weight:600; margin:0 6px 0 0;"><span id="langLabel">Language</span>:</label>
+    <select id="lang">
+      <option value="en">EN</option>
+      <option value="ru">RU</option>
+    </select>
+  </div>
+</div>
+
+<div id="intro" class="small">Enter current stats and completed expeditions; set a target to project growth. Check “Support frigate” to evaluate support (fuel + sum of other stats).</div>
+
+<div class="controls">
+  <div class="grid">
+    <div>
+      <label for="combat" class="small" id="labelCombat">Combat</label>
+      <input id="combat" type="number" min="0" value="0">
+      <label for="expl" class="small" id="labelExpl">Exploration</label>
+      <input id="expl" type="number" min="0" value="0">
+      <label for="ind" class="small" id="labelInd">Industry</label>
+      <input id="ind" type="number" min="0" value="0">
+      <label for="trade" class="small" id="labelTrade">Trade</label>
+      <input id="trade" type="number" min="0" value="0">
+      <label for="supportstat" class="small" id="labelSupport">Support / Fuel effect (negative is better)</label>
+      <input id="supportstat" type="number" value="0" disabled>
+    </div>
+
+    <div>
+      <label for="completed" id="labelCompleted">Expeditions completed</label>
+      <input id="completed" type="number" min="0" value="0">
+      <label for="target" class="small" id="labelTarget">Target expeditions (projection)</label>
+      <input id="target" type="number" min="0" value="55">
+      <div style="margin-top:10px;">
+        <label><input id="isSupport" type="checkbox"> <span id="labelIsSupport">Support frigate</span></label>
+        <div class="small" style="margin-top:8px;" id="helpIsSupport">If checked — evaluate as support. If unchecked — type = strongest of Combat/Exploration/Industry/Trade.</div>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px; align-items:center;">
+        <button id="calc" type="button">Calculate</button>
+        <button id="reset" type="button">Reset</button>
+        <div class="small muted" id="resetNote">Reset clears inputs and recomputes.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="out">
+  <div class="result-line"><span id="shipTypeLabel">Ship type</span>: <span id="shipType" class="badge">—</span></div>
+  <div class="result-line" id="apsLine">Ranks passed: —; to next rank: —</div>
+
+  <div id="supportSection" style="display:none;">
+    <div class="result-line" id="fuelLine">Fuel effect (future): —</div>
+    <div class="barWrap"><div id="fuelBar" class="bar"></div></div>
+    <div class="barLabel small" id="fuelLabel"></div>
+
+    <div class="result-line" id="sumOtherLine">Sum of other stats (future): —</div>
+    <div class="barWrap"><div id="sumBar" class="bar"></div></div>
+    <div class="barLabel small" id="sumLabel"></div>
+
+    <div class="result-line" id="combinedLine">Combined support potential: —</div>
+    <div class="result-line" id="idealLine" style="font-weight:600;">Support ideals: Fuel = <strong>-40</strong>, Sum-other = <strong>70</strong></div>
+    <div class="result-line" id="proximityLine">Proximity to ideal (combined): —</div>
+  </div>
+
+  <div class="result-line"><span id="projMainLabel">Projected main stat (future)</span>: <span id="futureMain" class="badge">—</span></div>
+  <div class="result-line"><span id="classLabel">Classification</span>: <span id="classification" class="badge wrap">—</span></div>
+  <div class="result-line"><span id="scoreLabel">12-point score</span>: <span id="score12" class="badge">—</span></div>
+  <div class="result-line"><span id="verdictLabel">Verdict</span>: <span id="verdictText" class="badge wrap">—</span></div>
+
+  <div style="margin-top:10px;">
+    <div class="result-line" style="margin-bottom:6px;" id="ceilingTitle">Ceiling proximity (unified):</div>
+    <div class="barWrap"><div id="ceilingBar" class="bar"></div></div>
+    <div class="barLabel small" id="ceilingLabel"></div>
+  </div>
+
+  <div class="result-line small" id="explainLine"></div>
+  <div id="err" style="display:none;color:#b00;font-size:12px;"></div>
+</div>
+
+<footer class="muted" id="footerNote">Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel −40, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).</footer>
+
+<script>
+(function(){
+  // ----- Constants
+  const IDEAL_FUEL = -40;
+  const IDEAL_SUM_OTHER = 70;
+  const CEILING_MAIN = 60;
+  const RANK_THRESHOLDS = [4,8,15,25,30,35,40,45,50,55];
+  const MAIN_STAT_SHARE = 0.6;    // non-support extra points → main
+  const FUEL_POINT_SHARE = 0.7;   // support extra points → fuel
+  const WEIGHT_FUEL = 0.8;        // combined proximity weights
+  const WEIGHT_SUM = 0.2;
+
+  // ----- i18n
+  const i18n = {
+    en: {
+      title:"NMS — Frigate Fleet Calculator",
+      langLabel:"Language",
+      intro:'Enter current stats and completed expeditions; set a target to project growth. Check “Support frigate” to evaluate support (fuel + sum of other stats).',
+      labels:{
+        combat:"Combat", expl:"Exploration", ind:"Industry", trade:"Trade",
+        support:"Support / Fuel effect (negative is better)",
+        completed:"Expeditions completed", target:"Target expeditions (projection)",
+        isSupport:"Support frigate", helpIsSupport:"If checked — evaluate as support. If unchecked — type = strongest of Combat/Exploration/Industry/Trade.",
+        calc:"Calculate", reset:"Reset", resetNote:"Reset clears inputs and recomputes.",
+        shipType:"Ship type",
+        aps:(ap,tonext,target,apt,add)=>`Ranks passed: <strong>${ap}</strong>; to next: <strong>${tonext===0?'0 — maybe all passed':tonext}</strong>. Target: ${target} (ranks @target: ${apt}; added: ${add}).`,
+        fuelLine:(f,c)=>`Fuel effect (future): <strong>${f}</strong> (current: ${c})`,
+        sumOther:(s)=>`Sum of other stats (future): <strong>${s}</strong>`,
+        combined:(p)=>`Combined support potential: <strong>${p}%</strong>`,
+        prox:(p)=>`Proximity to ideal (combined): <strong>${p}%</strong>`,
+        fuelLabel:(p)=>`Fuel proximity: ${p}% (ideal ${IDEAL_FUEL})`,
+        sumLabel:(p)=>`Sum-other proximity: ${p}% (ideal ${IDEAL_SUM_OTHER})`,
+        projMain:"Projected main stat (future)",
+        class:"Classification", score:"12-point score", verdict:"Verdict",
+        ceilingTitle:"Ceiling proximity (unified):",
+        ceilingLabelSupport:(p)=>`Ceiling proximity: ${p}% (combined support)`, 
+        ceilingLabelNon:(fm)=>`Ceiling proximity: ${Math.round((fm/CEILING_MAIN)*100)}% (future main ${fm}/${CEILING_MAIN})`,
+        footer:"Ranks at [4,8,15,25,30,35,40,45,50,55], each gives +6 points. Non-support: ~60% to main stat. Support: ~70% into fuel (more negative), ~30% split across four stats. Combined proximity: fuel 80% + sum-other 20% vs ideals (fuel −40, sum-other 70). Unified bar shows main/60 (non-support) or combined% (support).",
+        bands:{excellent:"Excellent", good:"Good", medium:"Medium", weak:"Weak", veryweak:"Very weak"}
+      },
+      verdictsNonByScore: {
+        1:"Trash — avoid at all costs, not worth touching",
+        2:"Tragic — even pirates would feel bad taking it",
+        3:"Barely flying — technically works, practically gets in the way",
+        4:"Below average — functions… but only when nobody's watching",
+        5:"Weak — feels alive, but always looks one mission away from falling apart",
+        6:"Mediocre — ‘eh, it’ll do’, budget performance guaranteed",
+        7:"Good — safe to send into battle without panic or prayers",
+        8:"Strong — a true workhorse, pulls its weight without complaints",
+        9:"Very strong — backbone of the fleet, respects itself and earns yours",
+        10:"Near-top — tasted perfection, yet fate left a hint of ‘almost’",
+        11:"Elite — an honored specimen, close to flawless",
+        12:"Perfect — rare find, take without hesitation; pamper and protect — crown jewel of the fleet"
+      },
+      verdictsSupportByScore: {
+        1:"Barely serviceable — almost no fuel cut",
+        2:"Very weak — negligible savings",
+        3:"Weak — minor effect; backup use",
+        4:"Below average — only short runs",
+        5:"Mediocre — modest boost (T1)",
+        6:"Decent — noticeable in mixed fleets",
+        7:"Solid — good reduction; T2 ready",
+        8:"Strong — clear impact; T3 feasible",
+        9:"Very strong — often near zero fuel",
+        10:"Elite — near‑minimum fuel most times",
+        11:"Top‑tier — maximal practical savings",
+        12:"Ideal — zero fuel in most scenarios"
+      }
+    },
+    ru: {
+      title:"NMS — Калькулятор флотилии фрегатов",
+      langLabel:"Язык",
+      intro:"Введи текущие статы и число завершённых экспедиций; укажи цель для прогноза. Отметь «Фрегат поддержки» для оценки (топливо + сумма остальных).",
+      labels:{
+        combat:"Боевой", expl:"Исследовательский", ind:"Промышленный", trade:"Торговый",
+        support:"Поддержка / расход топлива (отрицательное — лучше)",
+        completed:"Завершённые экспедиции", target:"Целевые экспедиции (прогноз)",
+        isSupport:"Фрегат поддержки", helpIsSupport:"Если отмечено — оценивается как поддержка. Если нет — тип = максимальному из боевой/исслед./пром./торг.",
+        calc:"Рассчитать", reset:"Сброс", resetNote:"Сброс очищает поля и пересчитывает.",
+        shipType:"Тип корабля",
+        aps:(ap,tonext,target,apt,add)=>`Рангов пройдено: <strong>${ap}</strong>; до следующего: <strong>${tonext===0?'0 — возможно все пройдены':tonext}</strong>. Цель: ${target} (рангов на цели: ${apt}; добавится: ${add}).`,
+        fuelLine:(f,c)=>`Топливо (прогноз): <strong>${f}</strong> (текущее: ${c})`,
+        sumOther:(s)=>`Сумма остальных (прогноз): <strong>${s}</strong>`,
+        combined:(p)=>`Комбинированный потенциал поддержки: <strong>${p}%</strong>`,
+        prox:(p)=>`Близость к идеалу (комбинированно): <strong>${p}%</strong>`,
+        fuelLabel:(p)=>`Близость по топливу: ${p}% (идеал ${IDEAL_FUEL})`,
+        sumLabel:(p)=>`Близость по сумме: ${p}% (идеал ${IDEAL_SUM_OTHER})`,
+        projMain:"Прогноз основного стата",
+        class:"Классификация", score:"Оценка по 12‑балльной шкале", verdict:"Вердикт",
+        ceilingTitle:"Близость к потолку (унифицировано):",
+        ceilingLabelSupport:(p)=>`Близость к потолку: ${p}% (комбинированный потенциал)`, 
+        ceilingLabelNon:(fm)=>`Близость к потолку: ${Math.round((fm/CEILING_MAIN)*100)}% (прогноз ${fm}/${CEILING_MAIN})`,
+        footer:"Ранги: [4,8,15,25,30,35,40,45,50,55], каждый даёт +6 очков. Не‑поддержка: ~60% в основной стат. Поддержка: ~70% в топливо (в минус), ~30% равномерно в 4 стата. Комбинированная близость: топливо 80% + сумма 20% к идеалам (топливо −40, сумма 70). Унифицированная шкала: main/60 (не‑поддержка) или combined% (поддержка).",
+        bands:{excellent:"Excellent", good:"Good", medium:"Medium", weak:"Weak", veryweak:"Very weak"}
+      },
+      verdictsNonByScore: {
+        1:"Мусор — облетать стороной, не брать",
+        2:"Печаль — даже пиратам будет стыдно продать",
+        3:"Нищета — вроде летает, но больше мешает",
+        4:"Ниже среднего — работает... когда нет никого рядом",
+        5:"Так себе — вроде живой, но ощущение, что вот-вот развалится",
+        6:"Среднячок — «ну... пойдёт», как комбайн на минималках",
+        7:"Хорош — можно брать в бой без страха и валидола",
+        8:"Сильный — рабочая лошадка, тянет и не жалуется",
+        9:"Очень сильный — основа флотилии, уважает себя и тебя",
+        10:"Почти топ — судьба дала вкус идеала, но оставила кусочек иллюзии",
+        11:"Элитный — почётный представитель, близко к идеалу",
+        12:"Идеал — редкость, брать без раздумий, беречь и лелеять! жемчужина флотилии"
+      },
+      verdictsSupportByScore: {
+        1:"Едва жив — экономии почти нет",
+        2:"Очень слаб — экономия неощутима",
+        3:"Слаб — эффект небольшой; как подмену",
+        4:"Ниже среднего — годится на короткие рейсы",
+        5:"Посредственный — скромный буст (T1)",
+        6:"Норм — заметно в смешанных флотах",
+        7:"Крепкий — хорошее снижение; T2 готов",
+        8:"Сильный — явный эффект; T3 достижим",
+        9:"Очень сильный — часто близко к нулю топлива",
+        10:"Элитный — почти минимум по топливу",
+        11:"Топ‑уровень — максимум практической экономии",
+        12:"Идеал — отличная экономия в большинстве сценариев"
+      }
+    }
+  };
+
+  // ----- DOM
+  const el = {
+    lang: document.getElementById('lang'),
+    // labels & texts
+    title: document.getElementById('title'), langLabel: document.getElementById('langLabel'),
+    intro: document.getElementById('intro'),
+    labelCombat: document.getElementById('labelCombat'),
+    labelExpl: document.getElementById('labelExpl'),
+    labelInd: document.getElementById('labelInd'),
+    labelTrade: document.getElementById('labelTrade'),
+    labelSupport: document.getElementById('labelSupport'),
+    labelCompleted: document.getElementById('labelCompleted'),
+    labelTarget: document.getElementById('labelTarget'),
+    labelIsSupport: document.getElementById('labelIsSupport'),
+    helpIsSupport: document.getElementById('helpIsSupport'),
+    resetNote: document.getElementById('resetNote'),
+    shipTypeLabel: document.getElementById('shipTypeLabel'),
+    projMainLabel: document.getElementById('projMainLabel'),
+    classLabel: document.getElementById('classLabel'),
+    scoreLabel: document.getElementById('scoreLabel'),
+    verdictLabel: document.getElementById('verdictLabel'),
+    ceilingTitle: document.getElementById('ceilingTitle'),
+    footerNote: document.getElementById('footerNote'),
+    // inputs
+    combat: document.getElementById('combat'),
+    expl: document.getElementById('expl'),
+    ind: document.getElementById('ind'),
+    trade: document.getElementById('trade'),
+    supportstat: document.getElementById('supportstat'),
+    completed: document.getElementById('completed'),
+    target: document.getElementById('target'),
+    isSupport: document.getElementById('isSupport'),
+    // outputs
+    shipType: document.getElementById('shipType'),
+    apsLine: document.getElementById('apsLine'),
+    supportSection: document.getElementById('supportSection'),
+    fuelLine: document.getElementById('fuelLine'),
+    sumOtherLine: document.getElementById('sumOtherLine'),
+    combinedLine: document.getElementById('combinedLine'),
+    idealLine: document.getElementById('idealLine'),
+    proximityLine: document.getElementById('proximityLine'),
+    fuelBar: document.getElementById('fuelBar'), fuelLabel: document.getElementById('fuelLabel'),
+    sumBar: document.getElementById('sumBar'), sumLabel: document.getElementById('sumLabel'),
+    futureMain: document.getElementById('futureMain'),
+    classification: document.getElementById('classification'),
+    score12: document.getElementById('score12'),
+    verdictText: document.getElementById('verdictText'),
+    ceilingBar: document.getElementById('ceilingBar'),
+    ceilingLabel: document.getElementById('ceilingLabel'),
+    explainLine: document.getElementById('explainLine'),
+    calc: document.getElementById('calc'),
+    reset: document.getElementById('reset'),
+    err: document.getElementById('err')
+  };
+
+  // ----- Helpers
+  function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+  function countRanks(exp){ let c=0; for(const t of RANK_THRESHOLDS) if(exp>=t) c++; return c; }
+  function nextRank(exp){ for(const t of RANK_THRESHOLDS) if(exp<t) return t; return null; }
+  function bandFromMain(v){
+    if (v >= 55) return "Excellent";
+    if (v >= 50) return "Good";
+    if (v >= 45) return "Medium";
+    if (v >= 40) return "Weak";
+    return "Very weak";
+  }
+  function bandFromProx(p){
+    if (p >= 90) return "Excellent";
+    if (p >= 75) return "Good";
+    if (p >= 60) return "Medium";
+    if (p >= 45) return "Weak";
+    return "Very weak";
+  }
+  function colorClass(b){
+    return b==="Excellent"?"st-excellent":b==="Good"?"st-good":b==="Medium"?"st-medium":b==="Weak"?"st-weak":"st-veryweak";
+  }
+  // Updated score mapping as requested
+  function scoreFromMain(v){
+    if (v < 37) return 1;
+    if (v < 39) return 2;
+    if (v < 41) return 3;
+    if (v < 43) return 4;
+    if (v < 45) return 5;
+    if (v < 47) return 6;
+    if (v < 49) return 7;
+    if (v < 51) return 8;
+    if (v < 53) return 9;
+    if (v < 55) return 10;
+    if (v < 57) return 11;
+    return 12;
+  }
+  function scoreFromProx(p){ return clamp(Math.round(1 + 11*p/100), 1, 12); }
+
+  // ----- Compute
+  function compute(){
+    try{
+      const lang = document.documentElement.lang || 'en';
+      const dict = i18n[lang] || i18n.en;
+
+      const c = Number(el.combat.value)||0;
+      const e = Number(el.expl.value)||0;
+      const ind = Number(el.ind.value)||0;
+      const tr = Number(el.trade.value)||0;
+      const s = Number(el.supportstat.value)||0;
+      const done = Math.max(0, Math.floor(Number(el.completed.value)||0));
+      const tgt  = Math.max(0, Math.floor(Number(el.target.value)||0));
+
+      const ranks_now = countRanks(done);
+      const ranks_tgt = countRanks(tgt);
+      const add_ranks = Math.max(0, ranks_tgt - ranks_now);
+      const extraPts  = add_ranks * 6;
+
+      const nxt = nextRank(done);
+      const toNext = nxt===null ? 0 : Math.max(0, nxt - done);
+      el.apsLine.innerHTML = dict.labels.aps(ranks_now, toNext, tgt, ranks_tgt, add_ranks);
+
+      // Determine type
+      let type = '—';
+      if (el.isSupport.checked){
+        type = (lang==='ru'?'Поддержка':'Support');
+      } else {
+        const arr = [{k:'Combat',v:c},{k:'Exploration',v:e},{k:'Industry',v:ind},{k:'Trade',v:tr}].sort((a,b)=>b.v-a.v);
+        type = arr[0]?.k || '—';
+      }
+      el.shipType.textContent = type;
+
+      // Projection
+      let fFuel = s, fC=c, fE=e, fI=ind, fT=tr;
+      if (el.isSupport.checked){
+        const fuelDelta = +(extraPts * FUEL_POINT_SHARE).toFixed(2);
+        const otherDelta = +(extraPts * (1 - FUEL_POINT_SHARE)).toFixed(2);
+        const per = +(otherDelta/4).toFixed(3);
+        fFuel = +(s - fuelDelta).toFixed(2);
+        fC = +(c + per).toFixed(2); fE = +(e + per).toFixed(2);
+        fI = +(ind + per).toFixed(2); fT = +(tr + per).toFixed(2);
+      }
+
+      // Future main
+      let futureMain = 0;
+      if (el.isSupport.checked){
+        futureMain = fFuel;
+      } else {
+        const currentMain = Math.max(c,e,ind,tr);
+        const gain = +(extraPts * MAIN_STAT_SHARE).toFixed(2);
+        futureMain = +(currentMain + gain).toFixed(2);
+        if (futureMain > CEILING_MAIN) futureMain = CEILING_MAIN;
+      }
+
+      // Support vs Non-support branches
+      let band, score12, verdictText, color;
+      if (el.isSupport.checked){
+        el.supportSection.style.display = 'block';
+
+        const sumOther = +(fC + fE + fI + fT).toFixed(2);
+        const fuelNorm = clamp((-fFuel)/(-IDEAL_FUEL), 0, 1);
+        const sumNorm = clamp(sumOther/IDEAL_SUM_OTHER, 0, 1);
+        const combined = WEIGHT_FUEL*fuelNorm + WEIGHT_SUM*sumNorm;
+        const prox = Math.round(combined*100);
+
+        el.fuelLine.innerHTML = dict.labels.fuelLine(fFuel, s);
+        el.sumOtherLine.innerHTML = dict.labels.sumOther(sumOther);
+        el.combinedLine.innerHTML = dict.labels.combined(prox);
+        el.proximityLine.innerHTML = dict.labels.prox(prox);
+        el.fuelBar.style.width = Math.round(fuelNorm*100) + '%';
+        el.fuelLabel.textContent = dict.labels.fuelLabel(Math.round(fuelNorm*100));
+        el.sumBar.style.width = Math.round(sumNorm*100) + '%';
+        el.sumLabel.textContent = dict.labels.sumLabel(Math.round(sumNorm*100));
+
+        // Unified ceiling = prox
+        el.ceilingBar.style.width = prox + '%';
+        el.ceilingLabel.textContent = dict.labels.ceilingLabelSupport(prox);
+
+        el.futureMain.textContent = String(fFuel);
+        band = bandFromProx(prox);
+        score12 = scoreFromProx(prox);
+        verdictText = (dict.verdictsSupportByScore[String(score12)] || '—');
+        color = colorClass(band);
+      } else {
+        el.supportSection.style.display = 'none';
+        const pct = Math.round((futureMain/CEILING_MAIN)*100);
+        el.ceilingBar.style.width = pct + '%';
+        el.ceilingLabel.textContent = dict.labels.ceilingLabelNon(futureMain);
+
+        el.futureMain.textContent = String(futureMain);
+        band = bandFromMain(futureMain);
+        score12 = scoreFromMain(futureMain);
+        verdictText = (dict.verdictsNonByScore[String(score12)] || '—');
+        color = colorClass(band);
+      }
+
+      // Paint badges
+      el.shipType.className = 'badge ' + color;
+      el.classification.textContent = (i18n[lang].labels.bands[band.toLowerCase().replace(' ','')] || band);
+      el.classification.className = 'badge wrap ' + color;
+      el.score12.textContent = String(score12);
+      el.score12.className = 'badge ' + color;
+      el.verdictText.textContent = verdictText;
+      el.verdictText.className = 'badge wrap ' + color;
+
+      // Explain
+      el.explainLine.textContent =
+        (lang==='ru'
+          ? `Ап-ранги: +${add_ranks} (очков: ${extraPts}). Не‑поддержка: ~${Math.round(MAIN_STAT_SHARE*100)}% в основной стат. Поддержка: ${Math.round(FUEL_POINT_SHARE*100)}% в топливо / ${Math.round((1-FUEL_POINT_SHARE)*100)}% в 4 стата. Веса комбинирования: ${Math.round(WEIGHT_FUEL*100)}% топливо / ${Math.round(WEIGHT_SUM*100)}% сумма.`
+          : `Rank-ups: +${add_ranks} (points: ${extraPts}). Non‑support: ~${Math.round(MAIN_STAT_SHARE*100)}% to main. Support: ${Math.round(FUEL_POINT_SHARE*100)}% fuel / ${Math.round((1-FUEL_POINT_SHARE)*100)}% stats. Combined weights: ${Math.round(WEIGHT_FUEL*100)}% fuel / ${Math.round(WEIGHT_SUM*100)}% sum.`
+        );
+
+      el.err.style.display = 'none';
+    }catch(e){
+      console.error(e);
+      el.err.style.display = 'block';
+      el.err.textContent = 'Error: ' + (e && e.message ? e.message : e);
+    }
+  }
+
+  // ----- Language setter
+  function setLang(lang){
+    const d = i18n[lang] || i18n.en;
+    document.documentElement.lang = lang;
+    el.lang.value = lang;
+
+    el.title.textContent = d.title;
+    el.langLabel.textContent = d.langLabel;
+    el.intro.textContent = d.intro;
+    el.labelCombat.textContent = d.labels.combat;
+    el.labelExpl.textContent = d.labels.expl;
+    el.labelInd.textContent = d.labels.ind;
+    el.labelTrade.textContent = d.labels.trade;
+    el.labelSupport.textContent = d.labels.support;
+    el.labelCompleted.textContent = d.labels.completed;
+    el.labelTarget.textContent = d.labels.target;
+    el.labelIsSupport.textContent = d.labels.isSupport;
+    el.helpIsSupport.textContent = d.labels.helpIsSupport;
+    el.calc.textContent = d.labels.calc;
+    el.reset.textContent = d.labels.reset;
+    el.resetNote.textContent = d.labels.resetNote;
+    el.shipTypeLabel.textContent = d.labels.shipType;
+    el.projMainLabel.textContent = d.labels.projMain;
+    el.classLabel.textContent = d.labels.class;
+    el.scoreLabel.textContent = d.labels.score;
+    el.verdictLabel.textContent = d.labels.verdict;
+    el.ceilingTitle.textContent = d.labels.ceilingTitle;
+    el.footerNote.textContent = d.labels.footer;
+
+    // Ideals line
+    el.idealLine.innerHTML = (lang==='ru'
+      ? 'Идеалы поддержки: Топливо = <strong>-40</strong>, Сумма остальных = <strong>70</strong>'
+      : 'Support ideals: Fuel = <strong>-40</strong>, Sum-other = <strong>70</strong>'
+    );
+  }
+
+  // ----- Bindings
+  el.calc.addEventListener('click', compute);
+  el.reset.addEventListener('click', ()=>{
+    el.combat.value=0; el.expl.value=0; el.ind.value=0; el.trade.value=0; el.supportstat.value=0;
+    el.completed.value=0; el.target.value=55; el.isSupport.checked=false;
+    el.supportstat.disabled = true;
+    compute();
+  });
+  el.lang.addEventListener('change', e=>{ setLang(e.target.value); compute(); });
+  // Toggle support input enabled/disabled
+  el.isSupport.addEventListener('change', ()=>{
+    if(el.isSupport.checked){ el.supportstat.disabled = false; }
+    else { el.supportstat.value = 0; el.supportstat.disabled = true; }
+    compute();
+  });
+
+  // Default — EN
+  setLang('en');
+  compute();
+})();
+</script>
+<div id="footerSNK" style="position:fixed; right:8px; bottom:6px; 
+            font-size:10px; color:#777; opacity:0.4;
+            pointer-events:none; user-select:none;">
+    2025. Created & developed by <b>SNK</b>
+</div>
+<script>
+(function(){
+  const footer = document.getElementById('footerSNK');
+
+  function updateFooterSNK(){
+    const lang = document.documentElement.getAttribute('lang') || 'en';
+    footer.innerHTML = (lang === 'ru')
+      ? '2025. Создано и разработано <b>SNK</b>'
+      : '2025. Created & developed by <b>SNK</b>';
+  }
+  updateFooterSNK();
+  const langSelect = document.getElementById('lang');
+  if (langSelect) {
+    langSelect.addEventListener('change', updateFooterSNK);
+  }
+  const mo = new MutationObserver(updateFooterSNK);
+  mo.observe(document.documentElement, { attributes: true, attributeFilter: ['lang'] });
+})();
+</script>
+</body>
+</html>
